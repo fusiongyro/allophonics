@@ -1,5 +1,13 @@
 module Phone where
 
+{-
+
+Phone.
+
+This module provides the low-level data types and functions for phones. 
+
+-}
+
 import Data.Map as Map
 import Data.Set as Set
 
@@ -88,3 +96,8 @@ wordPhones = undefined
 -- | phonesWord converts a list of Phones back into a word (using IPA)
 phonesWord :: IPAPhoneMap -> [Phone] -> String
 phonesWord = undefined
+
+-- | loadCorpus reads a file with the corpus words in it
+loadCorpus :: FilePath -> IO [[Phone]]
+loadCorpus = undefined
+
