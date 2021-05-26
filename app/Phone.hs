@@ -30,9 +30,9 @@ import Data.HashMap.Strict (toList, (!))
 
 
 data IsPresent = Present | Absent deriving (Show, Eq, Ord)
-data MannerFeature = 
+data MannerFeature =
       Consonantal
-    | Sonorant 
+    | Sonorant
     | Continuant
     | DelayedRelease
     | Approximant
@@ -41,7 +41,7 @@ data MannerFeature =
     | Nasal
     deriving (Show, Eq, Ord)
 
-data LaryngealFeature = 
+data LaryngealFeature =
       Voice
     | SpreadGlottis
     | ConstrictedGlottis
@@ -64,7 +64,7 @@ data PlaceFeature =
     | Tense
     deriving (Show, Eq, Ord)
 
-data Feature = 
+data Feature =
       M MannerFeature IsPresent
     | L LaryngealFeature IsPresent
     | P PlaceFeature IsPresent
@@ -77,43 +77,40 @@ presentFromChar :: (Eq s, IsString s) => s -> IsPresent
 presentFromChar "+" = Present
 presentFromChar _ = Absent
 
-recordToFeature :: (Eq s, IsString s) => (s, s) -> Maybe Feature
+
+-- This is a "function" that makes it easy to determine what to do with the CSV's headers
+-- Note that these features I don't know what to do with yet: syllabic, stress, long
+csvHeaderToFeature :: (IsString s, Ord s) => Map.Map s (IsPresent -> Feature)
+csvHeaderToFeature = Map.fromList [
+    ("consonantal", M Consonantal)
+  , ("sonorant", M Sonorant)
+  , ("continuant", M Continuant)
+  , ("delayed release", M DelayedRelease)
+  , ("approximant", M Approximant)
+  , ("tap", M Tap)
+  , ("trill", M Trill)
+  , ("nasal", M Nasal)
+  , ("voice", L Voice)
+  , ("spread gl", L SpreadGlottis)
+  , ("constr gl", L ConstrictedGlottis)
+  , ("LABIAL", P Labial)
+  , ("round", P Round)
+  , ("labiodental", P Labiodental)
+  , ("CORONAL", P Coronal)
+  , ("anterior", P Anterior)
+  , ("distributed", P Distributed)
+  , ("strident", P Strident)
+  , ("lateral", P Lateral)
+  , ("DORSAL", P Dorsal)
+  , ("high", P High)
+  , ("low", P Low)
+  , ("front", P Front)
+  , ("back", P Back)
+  , ("tense", P Tense)]
+
+recordToFeature :: (IsString s, Eq s, Ord s) => (s, s) -> Maybe Feature
 recordToFeature (_, "0") = Nothing
-recordToFeature ("consonantal", c) = Just $ M Consonantal $ presentFromChar c
-recordToFeature ("sonorant", c) = Just $ M Sonorant $ presentFromChar c
-recordToFeature ("continuant", c) = Just $ M Continuant $ presentFromChar c
-recordToFeature ("delayed release", c) = Just $ M DelayedRelease $ presentFromChar c
-recordToFeature ("approximant", c) = Just $ M Approximant $ presentFromChar c
-recordToFeature ("tap", c) = Just $ M Tap $ presentFromChar c
-recordToFeature ("trill", c) = Just $ M Trill $ presentFromChar c
-recordToFeature ("nasal", c) = Just $ M Nasal $ presentFromChar c
-
-recordToFeature ("voice", c) = Just $ L Voice $ presentFromChar c
-recordToFeature ("spread gl", c) = Just $ L SpreadGlottis $ presentFromChar c
-recordToFeature ("constr gl", c) = Just $ L ConstrictedGlottis $ presentFromChar c
-
-recordToFeature ("LABIAL", c) = Just $ P Labial $ presentFromChar c
-recordToFeature ("round", c) = Just $ P Round $ presentFromChar c
-recordToFeature ("labiodental", c) = Just $ P Labiodental $ presentFromChar c
-recordToFeature ("CORONAL", c) = Just $ P Coronal $ presentFromChar c
-recordToFeature ("anterior", c) = Just $ P Anterior $ presentFromChar c
-recordToFeature ("distributed", c) = Just $ P Distributed $ presentFromChar c
-recordToFeature ("strident", c) = Just $ P Strident $ presentFromChar c
-recordToFeature ("lateral", c) = Just $ P Lateral $ presentFromChar c
-recordToFeature ("DORSAL", c) = Just $ P Dorsal $ presentFromChar c
-recordToFeature ("high", c) = Just $ P High $ presentFromChar c
-recordToFeature ("low", c) = Just $ P Low $ presentFromChar c
-recordToFeature ("front", c) = Just $ P Front $ presentFromChar c
-recordToFeature ("back", c) = Just $ P Back $ presentFromChar c
-recordToFeature ("tense", c) = Just $ P Tense $ presentFromChar c
-
--- these features I don't know what to do with yet
-recordToFeature ("syllabic", c) = Nothing
-recordToFeature ("stress", c) = Nothing 
-recordToFeature ("long", c) = Nothing 
-
--- finally, a catchall
-recordToFeature _ = Nothing
+recordToFeature (s, c) = Map.lookup s csvHeaderToFeature <*> Just (presentFromChar c)
 
 {-
 
@@ -123,7 +120,7 @@ Encode and decode functions. Useful for going between Unicode IPA and Phones
 
 -- | decodePhone decodes a Unicode IPA symbol to a Phone
 decodePhone :: String -> Phone
-decodePhone = undefined 
+decodePhone = undefined
 
 -- | encodePhone converts a phone into a Unicode IPA symbol
 encodePhone :: Phone -> String
@@ -145,10 +142,6 @@ possible to decode and encode phonemic representations to phones.
 
 type IPAPhoneMap = Map.Map Text Phone
 
--- | loadFeatures loads a features CSV file into an IPAPhoneMap
-loadFeatures :: FilePath -> IO IPAPhoneMap
-loadFeatures = undefined
-
 -- | wordPhones converts a word (in IPA) into a list of Phones
 wordPhones :: IPAPhoneMap -> String -> [Phone]
 wordPhones = undefined
@@ -157,9 +150,9 @@ wordPhones = undefined
 phonesWord :: IPAPhoneMap -> [Phone] -> String
 phonesWord = undefined
 
--- | loadCorpus reads a file with the corpus words in it
-loadCorpus :: FilePath -> IO IPAPhoneMap
-loadCorpus fp = do
+-- | loadFeatures reads the CSV file with the phones/features matrix in it
+loadFeatures :: FilePath -> IO IPAPhoneMap
+loadFeatures fp = do
   -- read the file
   fc <- BS.readFile fp
 
@@ -170,4 +163,7 @@ loadCorpus fp = do
   return $ Map.fromList $ V.toList $ V.map recordToFeatureList rec
 
 recordToFeatureList :: NamedRecord -> (T.Text, Phone)
-recordToFeatureList rec = (decodeUtf8 $ rec ! "symbol", Set.fromList $ mapMaybe recordToFeature (Data.HashMap.Strict.toList rec))
+recordToFeatureList rec = (symbol, phone)
+  where 
+    symbol = decodeUtf8 $ rec ! "symbol"
+    phone = Set.fromList $ mapMaybe recordToFeature $ Data.HashMap.Strict.toList rec
