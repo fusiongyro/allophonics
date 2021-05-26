@@ -14,11 +14,20 @@ is itself a conceptual phoneme in the corpus.
 
 -}
 
-data Context = WordInitial
-             | WordFinal
-             | Preceding Phone
-             | Succeeding Phone
+data WordContext = WordInitial | WordMedial | WordFinal
+data Neighbor = Preceding | Succeeding
+
+
+data Context = WordBoundary
+
 
 data Rule = Rule Context Phone
 
 data Phoneme = Phoneme Phone [Rule]
+
+
+-- | combinePhonemes takes two phonemes and reduces them to one by combining their rules
+combinePhonemes :: Phoneme -> Phoneme -> Phoneme
+combinePhonemes (Phoneme p1 rules1) (Phoneme p2 rules2) = 
+    -- p1 and p2 had better be equal
+    undefined 

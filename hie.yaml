@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "app/Main.hs"
+      component: "allophonics:exe:allophonics"
+
+    - path: "app/Phone.hs"
+      component: "allophonics:exe:allophonics"
+
+    - path: "app/Phoneme.hs"
+      component: "allophonics:exe:allophonics"

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Phone where
 
 {-
@@ -8,10 +10,26 @@ This module provides the low-level data types and functions for phones.
 
 -}
 
-import Data.Map as Map
-import Data.Set as Set
+{-
 
-data IsPresent = Present | Absent deriving (Show, Eq)
+Phone.
+
+This module provides the low-level data types and functions for phones. 
+
+-}
+import Data.Maybe (mapMaybe)
+import Data.String (IsString)
+import Data.Map as Map hiding (mapMaybe, toList, (!))
+import Data.Set as Set hiding (toList)
+import Data.Vector as V hiding (mapMaybe, (!))
+import Data.ByteString.Lazy as BS
+import Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
+import Data.Csv as CSV
+import Data.HashMap.Strict (toList, (!))
+
+
+data IsPresent = Present | Absent deriving (Show, Eq, Ord)
 data MannerFeature = 
       Consonantal
     | Sonorant 
@@ -21,13 +39,13 @@ data MannerFeature =
     | Tap
     | Trill
     | Nasal
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data LaryngealFeature = 
       Voice
     | SpreadGlottis
     | ConstrictedGlottis
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data PlaceFeature =
       Labial
@@ -44,16 +62,58 @@ data PlaceFeature =
     | Front
     | Back
     | Tense
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data Feature = 
       M MannerFeature IsPresent
     | L LaryngealFeature IsPresent
     | P PlaceFeature IsPresent
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 type Phone = Set.Set Feature
 
+-- | presentFromChar is Absent or Present depending on the character
+presentFromChar :: (Eq s, IsString s) => s -> IsPresent
+presentFromChar "+" = Present
+presentFromChar _ = Absent
+
+recordToFeature :: (Eq s, IsString s) => (s, s) -> Maybe Feature
+recordToFeature (_, "0") = Nothing
+recordToFeature ("consonantal", c) = Just $ M Consonantal $ presentFromChar c
+recordToFeature ("sonorant", c) = Just $ M Sonorant $ presentFromChar c
+recordToFeature ("continuant", c) = Just $ M Continuant $ presentFromChar c
+recordToFeature ("delayed release", c) = Just $ M DelayedRelease $ presentFromChar c
+recordToFeature ("approximant", c) = Just $ M Approximant $ presentFromChar c
+recordToFeature ("tap", c) = Just $ M Tap $ presentFromChar c
+recordToFeature ("trill", c) = Just $ M Trill $ presentFromChar c
+recordToFeature ("nasal", c) = Just $ M Nasal $ presentFromChar c
+
+recordToFeature ("voice", c) = Just $ L Voice $ presentFromChar c
+recordToFeature ("spread gl", c) = Just $ L SpreadGlottis $ presentFromChar c
+recordToFeature ("constr gl", c) = Just $ L ConstrictedGlottis $ presentFromChar c
+
+recordToFeature ("LABIAL", c) = Just $ P Labial $ presentFromChar c
+recordToFeature ("round", c) = Just $ P Round $ presentFromChar c
+recordToFeature ("labiodental", c) = Just $ P Labiodental $ presentFromChar c
+recordToFeature ("CORONAL", c) = Just $ P Coronal $ presentFromChar c
+recordToFeature ("anterior", c) = Just $ P Anterior $ presentFromChar c
+recordToFeature ("distributed", c) = Just $ P Distributed $ presentFromChar c
+recordToFeature ("strident", c) = Just $ P Strident $ presentFromChar c
+recordToFeature ("lateral", c) = Just $ P Lateral $ presentFromChar c
+recordToFeature ("DORSAL", c) = Just $ P Dorsal $ presentFromChar c
+recordToFeature ("high", c) = Just $ P High $ presentFromChar c
+recordToFeature ("low", c) = Just $ P Low $ presentFromChar c
+recordToFeature ("front", c) = Just $ P Front $ presentFromChar c
+recordToFeature ("back", c) = Just $ P Back $ presentFromChar c
+recordToFeature ("tense", c) = Just $ P Tense $ presentFromChar c
+
+-- these features I don't know what to do with yet
+recordToFeature ("syllabic", c) = Nothing
+recordToFeature ("stress", c) = Nothing 
+recordToFeature ("long", c) = Nothing 
+
+-- finally, a catchall
+recordToFeature _ = Nothing
 
 {-
 
@@ -83,7 +143,7 @@ possible to decode and encode phonemic representations to phones.
 
 -}
 
-type IPAPhoneMap = Map.Map String Phone
+type IPAPhoneMap = Map.Map Text Phone
 
 -- | loadFeatures loads a features CSV file into an IPAPhoneMap
 loadFeatures :: FilePath -> IO IPAPhoneMap
@@ -98,6 +158,16 @@ phonesWord :: IPAPhoneMap -> [Phone] -> String
 phonesWord = undefined
 
 -- | loadCorpus reads a file with the corpus words in it
-loadCorpus :: FilePath -> IO [[Phone]]
-loadCorpus = undefined
+loadCorpus :: FilePath -> IO IPAPhoneMap
+loadCorpus fp = do
+  -- read the file
+  fc <- BS.readFile fp
 
+  -- parse the CSV (gross)
+  let Right (header, rec) = CSV.decodeByName fc
+
+  -- piece it together
+  return $ Map.fromList $ V.toList $ V.map recordToFeatureList rec
+
+recordToFeatureList :: NamedRecord -> (T.Text, Phone)
+recordToFeatureList rec = (decodeUtf8 $ rec ! "symbol", Set.fromList $ mapMaybe recordToFeature (Data.HashMap.Strict.toList rec))
